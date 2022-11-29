@@ -1,0 +1,2 @@
+url = "postgresql://giovanna:very_secure_pass0@postgres/projeto-labbd"
+secret_key = OUxCcJgoUTVr8BSdCPFukC2XErwqXmctHEy5oYVKAi8=

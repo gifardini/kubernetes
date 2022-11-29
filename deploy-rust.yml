@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rust-deploy
+  namespace: projeto
+  labels:
+    app: rust-relat
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rust-relat
+  
+  template:
+    metadata:
+      name: rust-pod
+      namespace: projeto
+      labels:
+        app: rust-relat
+    
+    spec:
+      containers:
+      - name: back-end-rust
+        image: giovannaopus/relatorio-rust:1.0
+
+        resources:
+          requests:
+            memory: "256M"
+            cpu: "500m"
+          limits:
+            memory: "512M"
+            cpu: "750m"        
+        ports:
+        - containerPort: 8080
+
+        env:
+          - name: ROCKET_ADDRESS
+            valueFrom:
+              configMapKeyRef:
+                name: rust-relat-cm
+                key: rocket_ip
+          - name: ROCKET_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: rust-relat-cm
+                key: rocket_port
+          - name: ROCKET_LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                name: rust-relat-cm
+                key: rocket_log_mode
+      
+        volumeMounts:
+        - name: rocket-secrets
+          mountPath: "/app/Rocket.toml"
+          subPath: Rocket-toml
+
+        livenessProbe:
+          httpGet:
+            path: /healthy
+            port: 8080
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 10
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+          periodSeconds: 10
+          failureThreshold: 3
+
+        securityContext:
+          capabilities:
+            drop:
+              - "ALL"
+          privileged: false
+          allowPrivilegeEscalation: false
+
+      volumes:
+      - name: rocket-secrets
+        secret:
+          secretName: rocket-secrets-toml
+---
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: rust-relat-svc
+  namespace: projeto
+
+spec:
+  selector:
+    app: rust-relat
+  
+  type: LoadBalancer 
+
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+    nodePort: 31000

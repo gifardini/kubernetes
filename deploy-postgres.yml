@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-deploy
+  namespace: projeto
+  labels:
+    app: postgres-app
+
+spec:
+  replicas: 3
+  serviceName: postgres-svc
+  selector:
+    matchLabels:
+      app: postgres-app
+
+  template:
+    metadata:
+      name: postgres-pod
+      namespace: projeto
+      labels:
+        app: postgres-app
+
+    spec:
+
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: postgres-db
+        image: giovannaopus/postgres-loaded:1.0
+        resources:
+          requests:
+            memory: "128M"
+            cpu: "250m"
+          limits:
+            memory: "512M"
+            cpu: "1000m"
+        ports:
+        - containerPort: 5432
+
+        env:
+          - name: POSTGRES_PASSWORD_FILE
+            value: /var/lib/postgresql/secret/POSTGRES_PASSWORD   
+          - name: POSTGRES_USER
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-cm
+                key: db-username 
+          - name: POSTGRES_DB
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-cm
+                key: db-name
+          - name: POSTGRES_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: postgres-cm
+                key: db-port
+        
+        volumeMounts:
+        - name: db-secret-vol
+          mountPath: "/var/lib/postgresql/secret"
+          readOnly: true
+        
+        - name: postgres-pv-storage
+          mountPath: /var/lib/postgresql/data
+        
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+
+      volumes:
+      - name: db-secret-vol
+        secret:
+          secretName: postgres-secret
+          optional: false 
+          defaultMode: 0400
+       
+      - name: postgres-pv-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: postgres-svc
+  namespace: projeto
+
+spec:
+  selector:
+    app: postgres-app
+  
+  type: LoadBalancer 
+
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+    nodePort: 30000
